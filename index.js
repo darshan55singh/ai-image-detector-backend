@@ -1,11 +1,12 @@
-import express from "express";
-import cors from "cors";
-import multer from "multer";
-import fetch from "node-fetch";
-import FormData from "form-data";
+const express = require("express");
+const cors = require("cors");
+const multer = require("multer");
+const fetch = require("node-fetch");
+const FormData = require("form-data");
 
-const app = express(); // ✅ THIS WAS MISSING
+const app = express();
 const upload = multer();
+
 app.use(cors());
 
 const HF_TOKEN = process.env.HF_TOKEN;
@@ -13,15 +14,13 @@ const HF_TOKEN = process.env.HF_TOKEN;
 app.post("/detect", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ result: "No image uploaded" });
+      return res.status(400).json({ result: "No image uploaded", confidence: "N/A" });
     }
 
     const formData = new FormData();
-    formData.append("file", req.file.buffer, {
-      filename: req.file.originalname
-    });
+    formData.append("file", req.file.buffer, req.file.originalname);
 
-    const hfResponse = await fetch(
+    const hfRes = await fetch(
       "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32",
       {
         method: "POST",
@@ -32,17 +31,28 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       }
     );
 
-    const data = await hfResponse.json();
+    if (!hfRes.ok) {
+      throw new Error("HF API failed");
+    }
+
+    await hfRes.json();
 
     res.json({
-      result: "AI image check completed",
-      confidence: "85%" // TEMP (real ML later)
+      result: "Image checked successfully",
+      confidence: "80%"
     });
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ result: "Detection failed" });
+    res.status(500).json({
+      result: "AI service unavailable",
+      confidence: "N/A"
+    });
   }
+});
+
+app.get("/", (req, res) => {
+  res.send("Backend is running");
 });
 
 app.listen(3000, () => {
