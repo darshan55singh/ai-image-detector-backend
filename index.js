@@ -12,7 +12,7 @@ app.get("/", (req, res) => {
   res.send("Backend is running");
 });
 
-app.post("/detect", upload.single("image"), async (req, res) => {
+app.post("/detect", upload.single("image"), (req, res) => {
   if (!req.file) {
     return res.json({
       result: "No image uploaded",
