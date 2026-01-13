@@ -1,3 +1,15 @@
+const express = require("express");
+const cors = require("cors");
+const multer = require("multer");
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
+
+const app = express(); // ✅ THIS LINE WAS MISSING
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.use(cors());
+app.use(express.json());
+
 app.post("/detect", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -21,14 +33,13 @@ app.post("/detect", upload.single("image"), async (req, res) => {
 
     const data = await response.json();
 
-    if (!data || !data[0]) {
+    if (!Array.isArray(data) || !data[0]) {
       return res.json({
         result: "Unable to analyze image",
         confidence: "N/A",
       });
     }
 
-    // CLIP scores are similarity-based
     const score = Math.round(data[0].score * 100);
 
     res.json({
@@ -45,4 +56,9 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       confidence: "N/A",
     });
   }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log("Backend running on port " + PORT);
 });
