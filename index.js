@@ -18,37 +18,45 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       });
     }
 
-    const response = await fetch(
+    const hfResponse = await fetch(
       "https://api-inference.huggingface.co/models/umm-maybe/AI-image-detector",
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${process.env.HF_TOKEN}`,
-          "Content-Type": "application/octet-stream",
         },
         body: req.file.buffer,
       }
     );
 
-    const data = await response.json();
+    const data = await hfResponse.json();
+
+    // 🧠 Handle model loading / errors
+    if (data.error || data.estimated_time) {
+      return res.json({
+        result: "⏳ AI model warming up, try again",
+        confidence: "N/A",
+      });
+    }
 
     if (!Array.isArray(data)) {
       throw new Error("Invalid AI response");
     }
 
-    const aiScore = Math.round(data[0].score * 100);
+    const score = Math.round(data[0].score * 100);
 
     res.json({
       result:
-        aiScore > 60
+        score > 60
           ? "⚠️ Likely AI-generated image"
           : "✅ Likely real image",
-      confidence: aiScore + "%",
+      confidence: score + "%",
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      result: "Detection failed",
+
+  } catch (error) {
+    console.error("AI Error:", error);
+    res.json({
+      result: "⚠️ AI service unavailable",
       confidence: "N/A",
     });
   }
