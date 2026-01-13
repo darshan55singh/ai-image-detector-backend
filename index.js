@@ -1,3 +1,17 @@
+const express = require("express");
+const cors = require("cors");
+const multer = require("multer");
+
+const app = express(); // ✅ THIS WAS MISSING / MISPLACED
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.use(cors());
+app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send("AI Image Detector Backend is running 🚀");
+});
+
 app.post("/detect", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -7,7 +21,7 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       });
     }
 
-    // TEMP RANDOM LOGIC (until real AI is stable)
+    // TEMP LOGIC (random confidence)
     const fakeProbability = Math.floor(Math.random() * 100);
 
     const result =
@@ -27,4 +41,9 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       confidence: "N/A"
     });
   }
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log("Backend running on port " + PORT);
 });
