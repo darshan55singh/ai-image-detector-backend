@@ -1,19 +1,16 @@
-import express from "express";
-import fetch from "node-fetch";
-import multer from "multer";
-import cors from "cors";
-
-const app = express();
-const upload = multer();
-app.use(cors());
-
 app.post("/detect", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "No image uploaded" });
+      return res.status(400).json({
+        result: "No image uploaded",
+        confidence: "N/A",
+      });
     }
 
-    const response = await fetch(
+    const fs = await import("fs");
+    const imageBuffer = fs.readFileSync(req.file.path);
+
+    const hfResponse = await fetch(
       "https://api-inference.huggingface.co/models/Organika/sdxl-detector",
       {
         method: "POST",
@@ -21,27 +18,42 @@ app.post("/detect", upload.single("image"), async (req, res) => {
           Authorization: `Bearer ${process.env.HF_TOKEN}`,
           "Content-Type": "application/octet-stream",
         },
-        body: req.file.buffer, // 🔥 MOST IMPORTANT
+        body: imageBuffer,
       }
     );
 
-    const text = await response.text();
+    const text = await hfResponse.text(); // IMPORTANT
 
-    // Debug safety
-    if (!text.startsWith("{") && !text.startsWith("[")) {
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
       console.error("HF RAW RESPONSE:", text);
-      return res.status(500).json({ error: "Invalid response from AI model" });
+      return res.status(500).json({
+        result: "AI model unavailable",
+        confidence: "N/A",
+      });
     }
 
-    const result = JSON.parse(text);
-    res.json(result);
+    const aiScore =
+      data?.[0]?.label === "AI"
+        ? data[0].score
+        : data?.[1]?.score || 0;
 
+    const confidence = Math.round(aiScore * 100) + "%";
+
+    res.json({
+      result:
+        aiScore > 0.5
+          ? "⚠️ Likely AI-generated image"
+          : "✅ Likely real image",
+      confidence,
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({
+      result: "Server error",
+      confidence: "N/A",
+    });
   }
-});
-
-app.listen(10000, () => {
-  console.log("Backend running on port 10000");
 });
