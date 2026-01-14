@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 const app = express();
 
@@ -20,23 +22,47 @@ app.get("/", (req, res) => {
   res.send("AI Image Detector Backend Running");
 });
 
-app.post("/detect", upload.single("image"), (req, res) => {
+app.post("/detect", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         result: "No image uploaded",
-        confidence: "0%",
+        confidence: "N/A",
       });
     }
 
-    const fakeProbability = Math.floor(Math.random() * 100);
+    const imageBuffer = require("fs").readFileSync(req.file.path);
+
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/umm-maybe/AI-image-detector",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.HF_TOKEN}`,
+          "Content-Type": "application/octet-stream",
+        },
+        body: imageBuffer,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      return res.status(500).json({
+        result: "AI model error",
+        confidence: "N/A",
+      });
+    }
+
+    const aiScore = data.find(d => d.label === "AI")?.score || 0;
+    const confidence = Math.round(aiScore * 100) + "%";
 
     res.json({
       result:
-        fakeProbability > 50
+        aiScore > 0.5
           ? "⚠️ Likely AI-generated image"
           : "✅ Likely real image",
-      confidence: fakeProbability + "%",
+      confidence,
     });
   } catch (err) {
     console.error(err);
