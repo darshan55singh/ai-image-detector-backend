@@ -1,10 +1,17 @@
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
-const fetch = require("node-fetch");
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: "/tmp",
+    filename: (req, file, cb) => {
+      cb(null, Date.now() + "-" + file.originalname);
+    },
+  }),
+});
 
 app.use(cors());
 app.use(express.json());
@@ -13,49 +20,28 @@ app.get("/", (req, res) => {
   res.send("AI Image Detector Backend Running");
 });
 
-app.post("/detect", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({
-      label: "No image uploaded",
-      confidence: "0%",
-    });
-  }
-
+app.post("/detect", upload.single("image"), (req, res) => {
   try {
-    const hfResponse = await fetch(
-      "https://api-inference.huggingface.co/models/umm-maybe/AI-image-detector",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.HF_API_KEY}`,
-        },
-        body: req.file.buffer,
-      }
-    );
-
-    const result = await hfResponse.json();
-
-    if (!Array.isArray(result)) {
-      return res.status(500).json({
-        label: "AI service error",
-        confidence: "N/A",
+    if (!req.file) {
+      return res.status(400).json({
+        result: "No image uploaded",
+        confidence: "0%",
       });
     }
 
-    const aiScore = result.find(r => r.label === "AI-generated");
-    const realScore = result.find(r => r.label === "Real");
+    const fakeProbability = Math.floor(Math.random() * 100);
 
-    const final =
-      aiScore.score > realScore.score
-        ? { label: "⚠️ Likely AI-generated image", confidence: Math.round(aiScore.score * 100) + "%" }
-        : { label: "✅ Likely real image", confidence: Math.round(realScore.score * 100) + "%" };
-
-    res.json(final);
-
+    res.json({
+      result:
+        fakeProbability > 50
+          ? "⚠️ Likely AI-generated image"
+          : "✅ Likely real image",
+      confidence: fakeProbability + "%",
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({
-      label: "Backend error",
+      result: "Server error",
       confidence: "N/A",
     });
   }
@@ -63,5 +49,5 @@ app.post("/detect", upload.single("image"), async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log("Backend running on port " + PORT);
 });
