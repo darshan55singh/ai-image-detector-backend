@@ -34,46 +34,33 @@ app.post("/detect", upload.single("image"), async (req, res) => {
     const imageBuffer = require("fs").readFileSync(req.file.path);
 
     const response = await fetch(
-      "https://api-inference.huggingface.co/models/umm-maybe/AI-image-detector",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.HF_TOKEN}`,
-          "Content-Type": "application/octet-stream",
-        },
-        body: imageBuffer,
-      }
-    );
-
-    const data = await response.json();
-
-    if (!Array.isArray(data)) {
-      return res.status(500).json({
-        result: "AI model error",
-        confidence: "N/A",
-      });
-    }
-
-    const aiScore = data.find(d => d.label === "AI")?.score || 0;
-    const confidence = Math.round(aiScore * 100) + "%";
-
-    res.json({
-      result:
-        aiScore > 0.5
-          ? "⚠️ Likely AI-generated image"
-          : "✅ Likely real image",
-      confidence,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      result: "Server error",
-      confidence: "N/A",
-    });
+  "https://api-inference.huggingface.co/models/Organika/sdxl-detector",
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.HF_TOKEN}`,
+    },
+    body: imageBuffer,
   }
-});
+);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log("Backend running on port " + PORT);
+const data = await response.json();
+
+if (!Array.isArray(data)) {
+  console.error("HF ERROR:", data);
+  return res.status(500).json({
+    result: "AI model error",
+    confidence: "N/A",
+  });
+}
+
+const ai = data.find(d => d.label.toLowerCase().includes("ai"));
+const score = ai ? ai.score : 0;
+
+res.json({
+  result:
+    score > 0.5
+      ? "⚠️ Likely AI-generated image"
+      : "✅ Likely real image",
+  confidence: Math.round(score * 100) + "%",
 });
