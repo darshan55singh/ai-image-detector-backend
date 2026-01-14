@@ -1,3 +1,27 @@
+import express from "express";
+import cors from "cors";
+import multer from "multer";
+import fetch from "node-fetch";
+import fs from "fs";
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: "/tmp",
+    filename: (req, file, cb) => {
+      cb(null, Date.now() + "-" + file.originalname);
+    },
+  }),
+});
+
+app.get("/", (req, res) => {
+  res.send("AI Image Detector Backend Running");
+});
+
 app.post("/detect", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -7,7 +31,6 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       });
     }
 
-    const fs = await import("fs");
     const imageBuffer = fs.readFileSync(req.file.path);
 
     const hfResponse = await fetch(
@@ -22,7 +45,7 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       }
     );
 
-    const text = await hfResponse.text(); // IMPORTANT
+    const text = await hfResponse.text();
 
     let data;
     try {
@@ -30,7 +53,7 @@ app.post("/detect", upload.single("image"), async (req, res) => {
     } catch {
       console.error("HF RAW RESPONSE:", text);
       return res.status(500).json({
-        result: "AI model unavailable",
+        result: "AI model busy / unavailable",
         confidence: "N/A",
       });
     }
@@ -40,14 +63,12 @@ app.post("/detect", upload.single("image"), async (req, res) => {
         ? data[0].score
         : data?.[1]?.score || 0;
 
-    const confidence = Math.round(aiScore * 100) + "%";
-
     res.json({
       result:
         aiScore > 0.5
           ? "⚠️ Likely AI-generated image"
           : "✅ Likely real image",
-      confidence,
+      confidence: Math.round(aiScore * 100) + "%",
     });
   } catch (err) {
     console.error(err);
@@ -56,4 +77,9 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       confidence: "N/A",
     });
   }
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log("Backend running on port", PORT);
 });
