@@ -55,7 +55,7 @@ app.post("/detect", upload.single("image"), async (req, res) => {
         confidence > 60
           ? "⚠️ Likely AI-generated image"
           : "✅ Likely human-made image",
-      confidence: confidence + "%"
+      confidence: confidence
     });
 
   } catch (err) {
