@@ -1,6 +1,21 @@
+import express from "express";
+import multer from "multer";
+import fetch from "node-fetch";
+import cors from "cors";
+
+const app = express(); // ✅ THIS WAS MISSING
+const upload = multer();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
 app.post("/detect", upload.single("image"), async (req, res) => {
   if (!req.file) {
-    return res.json({ isAI: null, confidence: null });
+    return res.json({
+      isAI: false,
+      confidence: 0
+    });
   }
 
   try {
@@ -20,15 +35,11 @@ app.post("/detect", upload.single("image"), async (req, res) => {
 
     const data = await response.json();
 
-    // 🔥 HARD CHECK
+    // ❗ SAFE CHECK
     if (!Array.isArray(data) || data.length === 0) {
-      // fallback confidence (NOT random)
-      const sizeKB = req.file.size / 1024;
-      const confidence = sizeKB < 500 ? 35 : sizeKB < 1500 ? 55 : 75;
-
       return res.json({
-        isAI: confidence > 60,
-        confidence
+        isAI: false,
+        confidence: 40
       });
     }
 
@@ -38,7 +49,7 @@ app.post("/detect", upload.single("image"), async (req, res) => {
 
     const confidence = aiItem
       ? Math.round(aiItem.score * 100)
-      : 40;
+      : 45;
 
     res.json({
       isAI: confidence > 60,
@@ -46,12 +57,18 @@ app.post("/detect", upload.single("image"), async (req, res) => {
     });
 
   } catch (err) {
-    console.error("HF ERROR:", err);
-
-    // FINAL SAFETY
+    console.error("AI ERROR:", err);
     res.json({
       isAI: false,
-      confidence: 40
+      confidence: 35
     });
   }
+});
+
+app.get("/", (req, res) => {
+  res.send("Backend is running ✅");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
