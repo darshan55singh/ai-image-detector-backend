@@ -3,8 +3,8 @@ import multer from "multer";
 import fetch from "node-fetch";
 import cors from "cors";
 
-const app = express(); // ✅ THIS WAS MISSING
-const upload = multer();
+const app = express();
+const upload = multer({ storage: multer.memoryStorage() });
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -12,14 +12,11 @@ app.use(express.json());
 
 app.post("/detect", upload.single("image"), async (req, res) => {
   if (!req.file) {
-    return res.json({
-      isAI: false,
-      confidence: 0
-    });
+    return res.json({ confidence: 0 });
   }
 
   try {
-    const response = await fetch(
+    const hfRes = await fetch(
       "https://api-inference.huggingface.co/models/umm-maybe/AI-image-detector",
       {
         method: "POST",
@@ -33,42 +30,44 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       }
     );
 
-    const data = await response.json();
+    const data = await hfRes.json();
 
-    // ❗ SAFE CHECK
+    // 🛡️ SAFETY
     if (!Array.isArray(data) || data.length === 0) {
-      return res.json({
-        isAI: false,
-        confidence: 40
-      });
+      return res.json({ confidence: 50 });
     }
 
-    const aiItem = data.find(d =>
-      d.label.toLowerCase().includes("ai")
+    // 🔥 CORRECT LOGIC
+    let confidence = 50;
+
+    const aiLabel = data.find(item =>
+      item.label.toLowerCase().includes("ai") ||
+      item.label.toLowerCase().includes("fake")
     );
 
-    const confidence = aiItem
-      ? Math.round(aiItem.score * 100)
-      : 45;
+    if (aiLabel) {
+      confidence = Math.round(aiLabel.score * 100);
+    } else {
+      const realLabel = data.find(item =>
+        item.label.toLowerCase().includes("real")
+      );
+      if (realLabel) {
+        confidence = Math.round((1 - realLabel.score) * 100);
+      }
+    }
 
-    res.json({
-      isAI: confidence > 60,
-      confidence
-    });
+    res.json({ confidence });
 
   } catch (err) {
-    console.error("AI ERROR:", err);
-    res.json({
-      isAI: false,
-      confidence: 35
-    });
+    console.error("HF ERROR:", err);
+    res.json({ confidence: 45 });
   }
 });
 
 app.get("/", (req, res) => {
-  res.send("Backend is running ✅");
+  res.send("Backend running ✅");
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log("Server running on", PORT);
 });
