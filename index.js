@@ -10,14 +10,14 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.send("AI Image Detector Backend (REAL AI) Running");
+  res.send("AI Image Detector Backend Running");
 });
 
 app.post("/detect", upload.single("image"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({
-      result: "No image uploaded",
-      confidence: "N/A"
+      isAI: null,
+      confidence: null
     });
   }
 
@@ -40,8 +40,8 @@ app.post("/detect", upload.single("image"), async (req, res) => {
 
     if (!Array.isArray(data)) {
       return res.status(500).json({
-        result: "AI detection failed",
-        confidence: "N/A"
+        isAI: null,
+        confidence: null
       });
     }
 
@@ -49,20 +49,18 @@ app.post("/detect", upload.single("image"), async (req, res) => {
       data.find(d => d.label.toLowerCase().includes("ai"))?.score || 0;
 
     const confidence = Math.round(aiScore * 100);
+    const isAI = confidence > 60;
 
     res.json({
-      result:
-        confidence > 60
-          ? "⚠️ Likely AI-generated image"
-          : "✅ Likely human-made image",
+      isAI: isAI,
       confidence: confidence
     });
 
   } catch (err) {
     console.error(err);
     res.status(500).json({
-      result: "Server error",
-      confidence: "N/A"
+      isAI: null,
+      confidence: null
     });
   }
 });
